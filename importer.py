@@ -1,8 +1,10 @@
 # vim: ft=python fileencoding=utf-8 sw=4 et sts=4
 
 from datetime import datetime
+from os import path
 from pathlib import Path
 import re
+from shutil import copy2
 from typing import Any, Dict
 
 from PyQt5.QtCore import QObject
@@ -50,7 +52,12 @@ class ImportHandler(QObject):
 
     @api.commands.register()
     def importer(self) -> None:
-        """Run importer."""
+        """Run importer.
+
+        Copy all marked images to the configured destination and order them in
+        the provided structure. Rename image according to the provided image
+        name scheme.
+        """
         _logger.debug("Import marked images")
 
         if not api.mark.paths:
@@ -67,11 +74,15 @@ class ImportHandler(QObject):
                     "Photo directory %s created successfully or already existed",
                     imageDir,
                 )
+                imageName = self._generateImageName(image, date)
+                copy2(str(Path(image)), imageDir / imageName)
+                _logger.debug("Copied %s to %s", str(Path(image)), imageDir / imageName)
             except FileExistsError as error:
                 _logger.error("Creating image directory %s failed: %s", imageDir, error)
+        _logger.debug("Imported all images")
 
     def _generateDirectoryStructure(self, date: datetime) -> Path:
-        """Generate the testination path for a certain image
+        """Generate the testination path for a current image
 
         Args:
             date: datetime of the current image
@@ -79,6 +90,21 @@ class ImportHandler(QObject):
 
         structure = re.sub(r"([a-zA-Z])", "%\\g<0>", self.DirectoryStructure)
         return self.DestinationPath / date.strftime(structure)
+
+    def _generateImageName(self, image: str, date: datetime) -> Path:
+        """Generat the image name for the current image
+
+        Args:
+            image: str path of the current image
+            date: datetime of the current image
+        """
+        if not self.ImageName:
+            _logger.debug("No image name provided, keep current image name")
+            return Path(path.split(image)[1])
+
+        ext = path.splitext(image)[1]
+        name = re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageName)
+        return date.strftime(name) + ext
 
     def _getSanatized(self, option: str) -> str:
         """Remove potential whitespaces and quotes from `option`."""
