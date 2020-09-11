@@ -74,7 +74,7 @@ class ImportHandler(QObject):
                     "Photo directory %s created successfully or already existed",
                     imageDir,
                 )
-                imageName = self._generateImageName(image, date)
+                imageName = self._generateImageName(image, date, imageDir)
                 copy2(str(Path(image)), imageDir / imageName)
                 _logger.debug("Copied %s to %s", str(Path(image)), imageDir / imageName)
             except FileExistsError as error:
@@ -91,20 +91,39 @@ class ImportHandler(QObject):
         structure = re.sub(r"([a-zA-Z])", "%\\g<0>", self.DirectoryStructure)
         return self.DestinationPath / date.strftime(structure)
 
-    def _generateImageName(self, image: str, date: datetime) -> Path:
+    def _generateImageName(self, src: str, date: datetime, dest: Path) -> Path:
         """Generat the image name for the current image
 
         Args:
-            image: str path of the current image
+            src: str path of the current image
             date: datetime of the current image
+            dest: Path where the image will be saved
         """
         if not self.ImageName:
             _logger.debug("No image name provided, keep current image name")
-            return Path(path.split(image)[1])
+            return Path(path.split(src)[1])
 
-        ext = path.splitext(image)[1]
-        name = re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageName)
-        return date.strftime(name) + ext
+        ext = path.splitext(src)[1]
+        nameDate = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageName))
+
+        name = nameDate + "-%s" + ext
+
+        index = 1
+
+        # Exponential search
+        while path.exists(dest / (name % str(index))):
+            index *= 2
+
+        # Binary Search interval start - index
+        start = index // 2
+        while start + 1 < index:
+            mid = (start + index) // 2
+            if path.exists(dest / (name % str(index))):
+                start = mid
+            else:
+                index = mid
+
+        return name % index
 
     def _getSanatized(self, option: str) -> str:
         """Remove potential whitespaces and quotes from `option`."""
