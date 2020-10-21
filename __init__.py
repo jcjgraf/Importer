@@ -22,13 +22,13 @@ class ImportHandler(QObject):
     DestinationPath: Path = None
     DirectoryStructure: str = None
     ImageName: str = None
+    NumPadding: int = 3
 
     @api.objreg.register
     def __init__(self, info: str) -> None:
         super().__init__()
 
-        self.options: Dict[str, str] = {}  # Dictionary storing all setting options
-
+        # Extract options from info string and save to global variables
         for e in info.split(";"):
             key, value = e.split("=")
             key, value = self._getSanatized(key), self._getSanatized(value)
@@ -82,7 +82,7 @@ class ImportHandler(QObject):
         _logger.debug("Imported all images")
 
     def _generateDirectoryStructure(self, date: datetime) -> Path:
-        """Generate the testination path for a current image
+        """Generate the destination path for a current image
 
         Args:
             date: datetime of the current image
@@ -92,7 +92,7 @@ class ImportHandler(QObject):
         return self.DestinationPath / date.strftime(structure)
 
     def _generateImageName(self, src: str, date: datetime, dest: Path) -> Path:
-        """Generat the image name for the current image
+        """Generate the image name for the current image
 
         Args:
             src: str path of the current image
@@ -106,19 +106,26 @@ class ImportHandler(QObject):
         ext = path.splitext(src)[1]
         nameDate = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageName))
 
-        name = nameDate + "-%s" + ext
+        # If name is unique in this directory
+        name = nameDate + ext
+
+        if not path.exists(dest / name):
+            return name
+
+        # Add number to name
+        name = nameDate + f"-%0{self.NumPadding}d" + ext
 
         index = 1
 
         # Exponential search
-        while path.exists(dest / (name % str(index))):
+        while path.exists(dest / (name % index)):
             index *= 2
 
         # Binary Search interval start - index
         start = index // 2
         while start + 1 < index:
             mid = (start + index) // 2
-            if path.exists(dest / (name % str(index))):
+            if path.exists(dest / (name % index)):
                 start = mid
             else:
                 index = mid
@@ -126,7 +133,7 @@ class ImportHandler(QObject):
         return name % index
 
     def _getSanatized(self, option: str) -> str:
-        """Remove potential whitespaces and quotes from `option`."""
+        """Remove potential white spaces and quotes from `option`."""
         return option.strip().replace('"', "").replace("'", "")
 
 
