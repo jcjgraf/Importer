@@ -51,14 +51,17 @@ class ImportHandler(QObject):
             _logger.error("Creating destination path directory failed: %s", error)
 
     @api.commands.register()
-    def importer(self) -> None:
+    def importer(self, identifier="") -> None:
         """Run importer.
 
         Copy all marked images to the configured destination and order them in
         the provided structure. Rename image according to the provided image
         name scheme.
+
+        Args:
+            identifier: If set it gets appended to the name of the image folder.
         """
-        _logger.debug("Import marked images")
+        _logger.debug(f"Import marked images. identifier={identifier}")
 
         if not api.mark.paths:
             _logger.info("No image marked. Please mark images to import")
@@ -68,7 +71,8 @@ class ImportHandler(QObject):
             date = datetime.strptime(exif.exif_date_time(image), "%Y:%m:%d %H:%M:%S")
 
             try:
-                imageDir = self._generateDirectoryStructure(date)
+                suffix = f"-{identifier}" if identifier else ""
+                imageDir = self._generateDirectoryStructure(date, suffix)
                 imageDir.mkdir(parents=True, exist_ok=True)
                 _logger.debug(
                     "Photo directory %s created successfully or already existed",
@@ -81,15 +85,17 @@ class ImportHandler(QObject):
                 _logger.error("Creating image directory %s failed: %s", imageDir, error)
         _logger.debug("Imported all images")
 
-    def _generateDirectoryStructure(self, date: datetime) -> Path:
+    def _generateDirectoryStructure(self, date: datetime, suffix: str) -> Path:
         """Generate the destination path for a current image
 
         Args:
             date: datetime of the current image
+            suffix: string appended to to the name of the outer most folder
         """
 
+        # Turn DirectoryStructure into valid strftime by prepending % to the format codes
         structure = re.sub(r"([a-zA-Z])", "%\\g<0>", self.DirectoryStructure)
-        return self.DestinationPath / date.strftime(structure)
+        return self.DestinationPath / (date.strftime(structure) + suffix)
 
     def _generateImageName(self, src: str, date: datetime, dest: Path) -> Path:
         """Generate the image name for the current image
