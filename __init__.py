@@ -91,6 +91,21 @@ class ImportHandler:
 
         _logger.debug("Imported all images")
 
+    @api.commands.register()
+    def importer_rearrange(self) -> None:
+        """Rearranges image in CWD accoring to configured schema."""
+
+        images = api.pathlist()
+
+        for image in images:
+
+            base_path = Path(path.split(image)[0])
+
+            name = self._get_image_name(image, base_path)
+
+            os.rename(image, base_path / name)
+            _logger.debug(f"Rename {image} to {name}")
+
     def _get_directory_structure(self, image, suffix: str) -> Path:
         """Generate the destination path for a current image.
 
