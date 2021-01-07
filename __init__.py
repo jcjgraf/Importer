@@ -103,6 +103,9 @@ class ImportHandler:
 
             name = self._get_image_name(image, base_path)
 
+            if image == str(base_path / name):
+                continue
+
             os.rename(image, base_path / name)
             _logger.debug(f"Rename {image} to {name}")
 
