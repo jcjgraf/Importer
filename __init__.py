@@ -68,7 +68,9 @@ class ImportHandler(QObject):
             return
 
         for image in api.mark.paths:
-            date = datetime.strptime(exif.exif_date_time(image), "%Y:%m:%d %H:%M:%S")
+            date = datetime.strptime(
+                exif.ExifHandler(image).exif_date_time(), "%Y:%m:%d %H:%M:%S"
+            )
 
             try:
                 suffix = f"-{identifier}" if identifier else ""
