@@ -1,5 +1,5 @@
 ## Vimiv Importer
-> [vimiv-qt](https://raw.github.com/karlch/vimiv-qt) plugin for a consistent import workflow
+> [vimiv-qt](https://github.com/karlch/vimiv-qt) plugin for a consistent import workflow
 
 Vimiv Importer lets you easily import images from a SD card, camera or any directory into your photo storage. The importer obeys your desired storage directory structure and image naming scheme.
 
@@ -13,4 +13,8 @@ Vimiv Importer lets you easily import images from a SD card, camera or any direc
 ### Usage
 Mark all images you wish to import in vimiv and call `:importer`. That's it!
 
+If there is a naming clash during the import the images first imported keeps its name. The second images gets a `-01` appended, the third clashing image a `-02` etc.
+
 It is possible to add an additional, image specific identifier to the import path using the optional `--identifier` argument. For example, if `DirectoryStructure=Y/Ymd` and we use `:importer --identifier=MyBirthday` the images get imported into `Y/Ymd-MyBirthday/`.
+
+When cleaning up the photo storage and deleting images it may happened that we delete `myImage.jpg` but keep `myImage-01.jpg`. To clean the naming the command `:importer-rearrange` can be used. It renames all images in the CDW according to the set naming schema.

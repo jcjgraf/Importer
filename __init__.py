@@ -91,6 +91,21 @@ class ImportHandler:
 
         _logger.debug("Imported all images")
 
+    @api.commands.register()
+    def importer_rearrange(self) -> None:
+        """Rearranges image in CWD accoring to configured schema."""
+
+        images = api.pathlist()
+
+        for image in images:
+
+            base_path = Path(path.split(image)[0])
+
+            name = self._get_image_name(image, base_path)
+
+            os.rename(image, base_path / name)
+            _logger.debug(f"Rename {image} to {name}")
+
     def _get_directory_structure(self, image, suffix: str) -> Path:
         """Generate the destination path for a current image.
 
@@ -135,7 +150,8 @@ class ImportHandler:
         # Turn ImageNameSchema into valid strftime by prepending % to the format codes
         name = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageNameSchema))
 
-        if not uniquify or not path.isfile(dest_dir / (name + ext)):
+        # If the file is itself
+        if not uniquify or not path.isfile(dest_dir / (name + ext)) or image == str(dest_dir / (name + ext)):
             return name + ext
 
         # Add counter
@@ -143,7 +159,8 @@ class ImportHandler:
 
         count = 1
 
-        while path.isfile(dest_dir / (name % count)):
+        # While the file exists but is it not the file itself
+        while path.isfile(dest_dir / (name % count)) and not image == str(dest_dir / (name % count)):
             count += 1
 
         return name % count
