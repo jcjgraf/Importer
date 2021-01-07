@@ -14,6 +14,3 @@ Vimiv Importer lets you easily import images from a SD card, camera or any direc
 Mark all images you wish to import in vimiv and call `:importer`. That's it!
 
 It is possible to add an additional, image specific identifier to the import path using the optional `--identifier` argument. For example, if `DirectoryStructure=Y/Ymd` and we use `:importer --identifier=MyBirthday` the images get imported into `Y/Ymd-MyBirthday/`.
-
-### Note
-This plugin is currently just a proof of concept and there are many open todos...
