@@ -1,13 +1,12 @@
 # vim: ft=python fileencoding=utf-8 sw=4 et sts=4
 
 from datetime import datetime
+import os
 from os import path
 from pathlib import Path
 import re
 from shutil import copy2
-from typing import Any, Dict
-
-from PyQt5.QtCore import QObject
+from typing import Any
 
 from vimiv import api
 from vimiv.utils import log
@@ -17,16 +16,15 @@ from vimiv.imutils import exif
 _logger = log.module_logger(__name__)
 
 
-class ImportHandler(QObject):
+class ImportHandler:
 
     DestinationPath: Path = None
-    DirectoryStructure: str = None
-    ImageName: str = None
-    NumPadding: int = 3
+    DirectorySchema: str = None
+    ImageNameSchema: str = None
+    num_padding: int = 2
 
     @api.objreg.register
     def __init__(self, info: str) -> None:
-        super().__init__()
 
         # Extract options from info string and save to global variables
         for e in info.split(";"):
@@ -45,8 +43,10 @@ class ImportHandler(QObject):
                 raise AttributeError("`DestinationPath` is not set")
             self.DestinationPath.mkdir(parents=True, exist_ok=True)
             _logger.debug("Destination path already exists or created successfully")
+
         except AttributeError:
             _logger.error("Destination path option is missing")
+
         except FileExistsError as error:
             _logger.error("Creating destination path directory failed: %s", error)
 
@@ -67,78 +67,86 @@ class ImportHandler(QObject):
             _logger.info("No image marked. Please mark images to import")
             return
 
+        suffix = f"-{identifier}" if identifier else ""
+
         for image in api.mark.paths:
-            date = datetime.strptime(
-                exif.ExifHandler(image).exif_date_time(), "%Y:%m:%d %H:%M:%S"
-            )
 
             try:
-                suffix = f"-{identifier}" if identifier else ""
-                imageDir = self._generateDirectoryStructure(date, suffix)
-                imageDir.mkdir(parents=True, exist_ok=True)
+                base_path = self._get_directory_structure(image, suffix)
+                base_path.mkdir(parents=True, exist_ok=True)
                 _logger.debug(
                     "Photo directory %s created successfully or already existed",
-                    imageDir,
+                    base_path,
                 )
-                imageName = self._generateImageName(image, date, imageDir)
-                copy2(str(Path(image)), imageDir / imageName)
-                _logger.debug("Copied %s to %s", str(Path(image)), imageDir / imageName)
+
+                name = self._get_image_name(image, base_path)
+
+                copy2(str(Path(image)), base_path / name)
+                _logger.debug("Copied %s to %s", image, base_path / name)
+
             except FileExistsError as error:
-                _logger.error("Creating image directory %s failed: %s", imageDir, error)
+                _logger.error(
+                    "Creating image directory %s failed: %s", base_path, error
+                )
+
         _logger.debug("Imported all images")
 
-    def _generateDirectoryStructure(self, date: datetime, suffix: str) -> Path:
-        """Generate the destination path for a current image
+    def _get_directory_structure(self, image, suffix: str) -> Path:
+        """Generate the destination path for a current image.
 
         Args:
-            date: datetime of the current image
-            suffix: string appended to to the name of the outer most folder
+            suffix: word appended to the name of the image folder
         """
 
-        # Turn DirectoryStructure into valid strftime by prepending % to the format codes
-        structure = re.sub(r"([a-zA-Z])", "%\\g<0>", self.DirectoryStructure)
+        date = datetime.strptime(
+            exif.ExifHandler(image).exif_date_time(), "%Y:%m:%d %H:%M:%S"
+        )
+
+        # Turn DirectorySchema into valid strftime by prepending % to the format codes
+        structure = re.sub(r"([a-zA-Z])", "%\\g<0>", self.DirectorySchema)
         return self.DestinationPath / (date.strftime(structure) + suffix)
 
-    def _generateImageName(self, src: str, date: datetime, dest: Path) -> Path:
-        """Generate the image name for the current image
+    def _get_image_name(
+        self, image: str, dest_dir: Path = None, uniquify: bool = True
+    ) -> str:
+        """Generate the image name according to the configured scheme.
+
+        If uniquify is set to True and dest_dir is set, then dest_dir is examined to
+        make sure that the image name is unique in base_dir. If not, a number is
+        appended to the name.
 
         Args:
-            src: str path of the current image
-            date: datetime of the current image
-            dest: Path where the image will be saved
+            image: path to the image
+            dest_dir: directory to consider for uniqueness
+            uniquify: if set a count is appended to make to image unique
         """
-        if not self.ImageName:
-            _logger.debug("No image name provided, keep current image name")
-            return Path(path.split(src)[1])
 
-        ext = path.splitext(src)[1]
-        nameDate = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageName))
+        assert (not uniquify) or (uniquify and dest_dir)
 
-        # If name is unique in this directory
-        name = nameDate + ext
+        if not self.ImageNameSchema:
+            _logger.debug("No ImageNameSchema provided, keep current image name")
+            return path.split(image)[1]
 
-        if not path.exists(dest / name):
-            return name
+        date = datetime.strptime(
+            exif.ExifHandler(image).exif_date_time(), "%Y:%m:%d %H:%M:%S"
+        )
 
-        # Add number to name
-        name = nameDate + f"-%0{self.NumPadding}d" + ext
+        ext = path.splitext(image)[1]
+        # Turn ImageNameSchema into valid strftime by prepending % to the format codes
+        name = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageNameSchema))
 
-        index = 1
+        if not uniquify or not path.isfile(dest_dir / (name + ext)):
+            return name + ext
 
-        # Exponential search
-        while path.exists(dest / (name % index)):
-            index *= 2
+        # Add counter
+        name = name + f"-%0{self.num_padding}d" + ext
 
-        # Binary Search interval start - index
-        start = index // 2
-        while start + 1 < index:
-            mid = (start + index) // 2
-            if path.exists(dest / (name % index)):
-                start = mid
-            else:
-                index = mid
+        count = 1
 
-        return name % index
+        while path.isfile(dest_dir / (name % count)):
+            count += 1
+
+        return name % count
 
     def _getSanatized(self, option: str) -> str:
         """Remove potential white spaces and quotes from `option`."""
@@ -148,7 +156,3 @@ class ImportHandler(QObject):
 def init(info: str, *_args: Any, **_kwargs: Any) -> None:
     """Setup import plugin by initializing the ImportHandler class."""
     ImportHandler(info)
-
-
-def cleanup(*_args: Any, **_kwargs: Any) -> None:
-    _logger.debug("Cleaning up importer plugin")
