@@ -151,16 +151,22 @@ class ImportHandler:
         name = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageNameSchema))
 
         # If the file is itself
-        if not uniquify or not path.isfile(dest_dir / (name + ext)) or image == str(dest_dir / (name + ext)):
+        if (
+            not uniquify
+            or not path.isfile(dest_dir / (name + ext))
+            or image == str(dest_dir / (name + ext))
+        ):
             return name + ext
 
         # Add counter
-        name = name + f"-%0{self.num_padding}d" + ext
+        name = name + f"_%0{self.num_padding}d" + ext
 
         count = 1
 
         # While the file exists but is it not the file itself
-        while path.isfile(dest_dir / (name % count)) and not image == str(dest_dir / (name % count)):
+        while path.isfile(dest_dir / (name % count)) and not image == str(
+            dest_dir / (name % count)
+        ):
             count += 1
 
         return name % count
