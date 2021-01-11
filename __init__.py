@@ -21,6 +21,8 @@ class ImportHandler:
     DestinationPath: Path = None
     DirectorySchema: str = None
     ImageNameSchema: str = None
+    ClearMark: bool = True
+
     num_padding: int = 2
 
     @api.objreg.register
@@ -90,6 +92,9 @@ class ImportHandler:
                 )
 
         _logger.debug("Imported all images")
+
+        if self.ClearMark:
+            api.mark.mark_clear()
 
     @api.commands.register()
     def importer_rearrange(self) -> None:
