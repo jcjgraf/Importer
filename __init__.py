@@ -22,6 +22,7 @@ class ImportHandler:
     DirectorySchema: str = None
     ImageNameSchema: str = None
     ClearMark: bool = True
+    PostInstall: str = None
 
     num_padding: int = 2
 
@@ -71,6 +72,8 @@ class ImportHandler:
 
         suffix = f"-{identifier}" if identifier else ""
 
+        new_files = list()
+
         for image in api.mark.paths:
 
             try:
@@ -86,6 +89,8 @@ class ImportHandler:
                 copy2(str(Path(image)), base_path / name)
                 _logger.debug("Copied %s to %s", image, base_path / name)
 
+                new_files.append(str(base_path / name))
+
             except FileExistsError as error:
                 _logger.error(
                     "Creating image directory %s failed: %s", base_path, error
@@ -95,6 +100,9 @@ class ImportHandler:
 
         if self.ClearMark:
             api.mark.mark_clear()
+
+        if self.PostInstall:
+            os.system(eval(self.PostInstall))
 
     @api.commands.register()
     def importer_rearrange(self) -> None:
@@ -181,7 +189,8 @@ class ImportHandler:
 
     def _getSanatized(self, option: str) -> str:
         """Remove potential white spaces and quotes from `option`."""
-        return option.strip().replace('"', "").replace("'", "")
+        # return option.strip().replace('"', "").replace("'", "")
+        return option.strip()
 
 
 def init(info: str, *_args: Any, **_kwargs: Any) -> None:
