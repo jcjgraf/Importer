@@ -8,7 +8,7 @@ import re
 from shutil import copy2
 from typing import Any
 
-from vimiv import api
+from vimiv import api, utils
 from vimiv.utils import log
 from vimiv.imutils import exif
 
@@ -66,6 +66,12 @@ class ImportHandler:
         """
         _logger.debug(f"Import marked images. identifier={identifier}")
 
+        self._importer(identifier)
+
+    # TODO: Call _importer directly, but nested decorators do not seems to work
+    @utils.asyncfunc()
+    def _importer(self, identifier=""):
+
         if not api.mark.paths:
             _logger.info("No image marked. Please mark images to import")
             return
@@ -102,7 +108,9 @@ class ImportHandler:
             api.mark.mark_clear()
 
         if self.PostInstall:
+            _logger.debug("Starting Hook")
             os.system(eval(self.PostInstall))
+            _logger.debug("Hook Ended")
 
     @api.commands.register()
     def importer_rearrange(self) -> None:
