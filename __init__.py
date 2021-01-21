@@ -6,6 +6,7 @@ from os import path
 from pathlib import Path
 import re
 from shutil import copy2
+import threading
 from typing import Any
 
 from vimiv import api, utils
@@ -26,8 +27,12 @@ class ImportHandler:
 
     num_padding: int = 2
 
+    _running_imports: int = 0
+
     @api.objreg.register
     def __init__(self, info: str) -> None:
+
+        self._lock = threading.Lock()
 
         # Extract options from info string and save to global variables
         for e in info.split(";"):
@@ -64,6 +69,10 @@ class ImportHandler:
         Args:
             identifier: If set it gets appended to the name of the image folder.
         """
+
+        with self._lock:
+            self._running_imports += 1
+
         _logger.debug(f"Import marked images. identifier={identifier}")
 
         images = api.mark.paths.copy()
@@ -115,6 +124,11 @@ class ImportHandler:
             os.system(eval(self.PostInstall))
             _logger.debug("Hook Ended")
 
+        with self._lock:
+            self._running_imports -= 1
+
+        api.status.update("import done")
+
     @api.commands.register()
     def importer_rearrange(self) -> None:
         """Rearranges image in CWD accoring to configured schema."""
@@ -132,6 +146,13 @@ class ImportHandler:
 
             os.rename(image, base_path / name)
             _logger.debug(f"Rename {image} to {name}")
+
+    @api.status.module("{importer}")
+    def _importer_status(self) -> str:
+        if self._running_imports != 0:
+            return f"Importer: {self._running_imports}"
+
+        return ""
 
     def _get_directory_structure(self, image, suffix: str) -> Path:
         """Generate the destination path for a current image.
