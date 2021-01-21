@@ -54,7 +54,7 @@ class ImportHandler:
             _logger.error("Creating destination path directory failed: %s", error)
 
     @api.commands.register()
-    def importer(self, identifier="") -> None:
+    def importer(self, identifier="", skip_duplicates=False) -> None:
         """Run importer.
 
         Copy all marked images to the configured destination and order them in
@@ -62,7 +62,8 @@ class ImportHandler:
         name scheme.
 
         Args:
-            identifier: If set it gets appended to the name of the image folder.
+            identifier: if set it gets appended to the name of the image folder.
+            skip_duplicates: if true for each image it is checked if it is already imported.
         """
         _logger.debug(f"Import marked images. identifier={identifier}")
 
@@ -70,7 +71,7 @@ class ImportHandler:
 
     # TODO: Call _importer directly, but nested decorators do not seems to work
     @utils.asyncfunc()
-    def _importer(self, identifier=""):
+    def _importer(self, identifier, skip_duplicates):
 
         if not api.mark.paths:
             _logger.info("No image marked. Please mark images to import")
@@ -90,7 +91,14 @@ class ImportHandler:
                     base_path,
                 )
 
-                name = self._get_image_name(image, base_path)
+                try:
+                    name = self._get_image_name(image, base_path)
+                except DuplicateFile as e:
+                    log.info(
+                        "File %s seems to be a douplicate of %s. Skipping import",
+                        image,
+                        e.file,
+                    )
 
                 copy2(str(Path(image)), base_path / name)
                 _logger.debug("Copied %s to %s", image, base_path / name)
@@ -146,7 +154,11 @@ class ImportHandler:
         return self.DestinationPath / (date.strftime(structure) + suffix)
 
     def _get_image_name(
-        self, image: str, dest_dir: Path = None, uniquify: bool = True
+        self,
+        image: str,
+        dest_dir: Path = None,
+        uniquify: bool = True,
+        detect_duplicate: bool = False,
     ) -> str:
         """Generate the image name according to the configured scheme.
 
@@ -158,6 +170,7 @@ class ImportHandler:
             image: path to the image
             dest_dir: directory to consider for uniqueness
             uniquify: if set a count is appended to make to image unique
+            detect_duplicate: raide DuplicateFile if file already imported
         """
 
         assert (not uniquify) or (uniquify and dest_dir)
@@ -174,7 +187,10 @@ class ImportHandler:
         # Turn ImageNameSchema into valid strftime by prepending % to the format codes
         name = date.strftime(re.sub(r"([a-zA-Z])", "%\\g<0>", self.ImageNameSchema))
 
-        # If the file is itself
+        if detect_duplicate and self._are_equal(image, str(dest_dir / (name + ext))):
+            raise DuplicateFile(str(dest_dir / (name + ext)))
+
+        # If the file is itself (source and destination match)
         if (
             not uniquify
             or not path.isfile(dest_dir / (name + ext))
@@ -193,6 +209,9 @@ class ImportHandler:
         ):
             count += 1
 
+            if detect_duplicate and self._are_equal(image, name % count):
+                raise DuplicateFile(name % count)
+
         return name % count
 
     def _getSanatized(self, option: str) -> str:
@@ -200,7 +219,17 @@ class ImportHandler:
         # return option.strip().replace('"', "").replace("'", "")
         return option.strip()
 
+    def _are_equal(file1: str, file2: str) -> bool:
+        """Compares the two files for equality."""
+        if os.path.getsize(file1) == os.path.getsize(file2):
+            return open(file1, "r").read() == open(file2, "r").read()
+
 
 def init(info: str, *_args: Any, **_kwargs: Any) -> None:
     """Setup import plugin by initializing the ImportHandler class."""
     ImportHandler(info)
+
+
+class DuplicateFile(Exception):
+    def __init__(self, conflict_file):
+        self.file = conflict_file
