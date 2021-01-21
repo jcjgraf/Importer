@@ -23,3 +23,8 @@ If there is a naming clash during the import the images first imported keeps its
 It is possible to add an additional, image specific identifier to the import path using the optional `--identifier` argument. For example, if `DirectoryStructure=Y/Ymd` and we use `:importer --identifier=MyBirthday` the images get imported into `Y/Ymd-MyBirthday/`.
 
 When cleaning up the photo storage and deleting images it may happened that we delete `myImage.jpg` but keep `myImage_01.jpg`. To clean the naming the command `:importer-rearrange` can be used. It renames all images in the CDW according to the set naming schema.
+
+### Status Bar Module
+Importer provides the status bar module `{importer}`. It shows the number of currently running import tasks.
+
+For instruction on how to enable it please consult the [vimiv docs](https://karlch.github.io/vimiv-qt/documentation/configuration/statusbar.html).
